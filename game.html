@@ -288,6 +288,7 @@
         font-weight: 700;
         background: linear-gradient(135deg, #00e5ff, #ff6ec7);
         -webkit-background-clip: text;
+        background-clip: text;
         -webkit-text-fill-color: transparent;
       }
       #portraitOverlay p {
@@ -887,6 +888,7 @@
         clearBalls("p1");
         clearBalls("p2");
         stopBGM();
+        releaseWakeLock();
         sfxGameOver();
         const w =
           state.p1.lives <= 0 && state.p2.lives <= 0
