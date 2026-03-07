@@ -1,0 +1,1102 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="theme-color" content="#000000" />
+    <title>FingerPop – 2 Player Arcade</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: none;
+      }
+      body {
+        background: #000;
+        overflow: hidden;
+        font-family: "Segoe UI", sans-serif;
+        user-select: none;
+        -webkit-user-select: none;
+        /* Prevent iOS overscroll bounce */
+        position: fixed;
+        width: 100%;
+        height: 100%;
+      }
+
+      #webcam {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+        z-index: 1;
+      }
+      #skelCanvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 2;
+        pointer-events: none;
+      }
+      #gameCanvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 3;
+        pointer-events: none;
+      }
+      #hud {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 5;
+        pointer-events: none;
+      }
+      .hud-bar {
+        display: flex;
+        align-items: center;
+        padding: clamp(5px, 1.5vw, 10px) clamp(8px, 2vw, 18px);
+        padding-left: max(clamp(8px, 2vw, 18px), env(safe-area-inset-left));
+        padding-right: max(clamp(8px, 2vw, 18px), env(safe-area-inset-right));
+        padding-top: max(clamp(5px, 1.5vw, 10px), env(safe-area-inset-top));
+        background: linear-gradient(
+          180deg,
+          rgba(0, 0, 0, 0.85) 0%,
+          transparent 100%
+        );
+      }
+      .player-hud {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: clamp(6px, 1.5vw, 14px);
+      }
+      .player-hud.right {
+        flex-direction: row-reverse;
+      }
+      .player-label {
+        font-size: clamp(13px, 2.8vw, 22px);
+        font-weight: 800;
+        letter-spacing: 1px;
+        text-shadow: 0 0 12px currentColor;
+      }
+      .p1-color {
+        color: #00e5ff;
+      }
+      .p2-color {
+        color: #ff6ec7;
+      }
+      .lives {
+        display: flex;
+        gap: clamp(3px, 0.8vw, 6px);
+      }
+      .heart {
+        font-size: clamp(14px, 2.8vw, 22px);
+        transition: all 0.3s;
+      }
+      .heart.dead {
+        opacity: 0.15;
+        filter: grayscale(1);
+      }
+      .score-box {
+        font-size: clamp(18px, 3.5vw, 30px);
+        font-weight: 900;
+        color: #fff;
+        min-width: clamp(40px, 6vw, 62px);
+        text-align: center;
+        text-shadow: 0 0 14px rgba(255, 255, 255, 0.6);
+      }
+      .sep {
+        width: 2px;
+        background: rgba(255, 255, 255, 0.2);
+        margin: 2px clamp(4px, 1vw, 12px);
+      }
+      #divider {
+        position: fixed;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 2px;
+        height: 100%;
+        z-index: 4;
+        pointer-events: none;
+        background: linear-gradient(
+          180deg,
+          transparent,
+          rgba(255, 255, 255, 0.28) 50%,
+          transparent
+        );
+      }
+      #splash {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(10px, 2vh, 18px);
+        z-index: 10;
+        padding: 20px;
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+      }
+      #splash h1 {
+        font-size: clamp(32px, 7vw, 58px);
+        font-weight: 900;
+        background: linear-gradient(135deg, #00e5ff, #ff6ec7);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+      }
+      #splash p {
+        color: rgba(255, 255, 255, 0.72);
+        font-size: clamp(13px, 2vw, 17px);
+        text-align: center;
+        max-width: 90vw;
+        line-height: 1.7;
+      }
+      .winner {
+        font-size: clamp(16px, 3.5vw, 28px);
+        font-weight: 700;
+        color: #ffd700;
+        text-shadow: 0 0 20px #ffd70099;
+        text-align: center;
+      }
+      #startBtn {
+        padding: clamp(12px, 2vh, 15px) clamp(28px, 5vw, 44px);
+        border: none;
+        border-radius: 50px;
+        background: linear-gradient(135deg, #00e5ff, #ff6ec7);
+        color: #000;
+        font-size: clamp(15px, 2.5vw, 20px);
+        font-weight: 800;
+        cursor: pointer;
+        box-shadow: 0 4px 32px rgba(0, 229, 255, 0.45);
+        transition: transform 0.15s;
+        pointer-events: all;
+        /* Bigger touch target on mobile */
+        min-height: 52px;
+        min-width: 160px;
+      }
+      #startBtn:active {
+        transform: scale(0.96);
+      }
+      #loader {
+        position: fixed;
+        inset: 0;
+        background: #0a0a1a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        z-index: 20;
+      }
+      #loader h2 {
+        color: #fff;
+        font-size: 22px;
+      }
+      #loaderBar {
+        width: 260px;
+        height: 8px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+      }
+      #loaderFill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #00e5ff, #ff6ec7);
+        border-radius: 8px;
+        transition: width 0.4s;
+      }
+      #loaderStatus {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 14px;
+      }
+
+      /* Music toggle button */
+      #musicBtn {
+        position: fixed;
+        bottom: max(16px, env(safe-area-inset-bottom));
+        right: max(16px, env(safe-area-inset-right));
+        z-index: 6;
+        width: clamp(44px, 6vw, 54px);
+        height: clamp(44px, 6vw, 54px);
+        border-radius: 50%;
+        border: none;
+        background: rgba(255, 255, 255, 0.18);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        color: #fff;
+        font-size: clamp(18px, 3vw, 24px);
+        cursor: pointer;
+        transition: background 0.2s;
+        pointer-events: all;
+      }
+      #musicBtn:active {
+        background: rgba(255, 255, 255, 0.35);
+      }
+
+      /* ── Portrait mode warning ── */
+      #portraitOverlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 100;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        text-align: center;
+        padding: 30px;
+      }
+      #portraitOverlay .rotate-icon {
+        font-size: 72px;
+        animation: rotatePulse 1.5s infinite;
+      }
+      @keyframes rotatePulse {
+        0%,
+        100% {
+          transform: rotate(-15deg);
+        }
+        50% {
+          transform: rotate(15deg);
+        }
+      }
+      #portraitOverlay h2 {
+        font-size: 22px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #00e5ff, #ff6ec7);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      #portraitOverlay p {
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      /* Show portrait overlay only on narrow portrait screens */
+      @media (orientation: portrait) and (max-width: 600px) {
+        #portraitOverlay {
+          display: flex;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Portrait rotate prompt -->
+    <div id="portraitOverlay">
+      <div class="rotate-icon">📱</div>
+      <h2>Putar Layar ke Landscape!</h2>
+      <p>
+        Game ini dimainkan secara horizontal.<br />Putar HP kamu ke samping
+        untuk mulai bermain.
+      </p>
+    </div>
+
+    <video id="webcam" autoplay playsinline muted></video>
+    <canvas id="skelCanvas"></canvas>
+    <canvas id="gameCanvas"></canvas>
+    <div id="divider"></div>
+
+    <div id="hud">
+      <div class="hud-bar">
+        <div class="player-hud">
+          <span class="player-label p1-color">P1</span>
+          <div class="lives">
+            <span class="heart" id="p1h1">❤️</span>
+            <span class="heart" id="p1h2">❤️</span>
+            <span class="heart" id="p1h3">❤️</span>
+          </div>
+          <div class="score-box" id="score-p1">0</div>
+        </div>
+        <div class="sep"></div>
+        <div class="player-hud right">
+          <span class="player-label p2-color">P2</span>
+          <div class="lives">
+            <span class="heart" id="p2h1">❤️</span>
+            <span class="heart" id="p2h2">❤️</span>
+            <span class="heart" id="p2h3">❤️</span>
+          </div>
+          <div class="score-box" id="score-p2">0</div>
+        </div>
+      </div>
+    </div>
+
+    <button id="musicBtn" title="Toggle music">🎵</button>
+
+    <div id="loader">
+      <h2>⚡ FingerPop Loading…</h2>
+      <div id="loaderBar"><div id="loaderFill"></div></div>
+      <div id="loaderStatus">Memuat library…</div>
+    </div>
+
+    <div id="splash" style="display: none">
+      <h1 id="splashTitle">FingerPop!</h1>
+      <p id="splashDesc">
+        Sentuh bola dengan jari sebelum jatuh ke bawah!<br />
+        <strong style="color: #00e5ff">Kiri = Player 1</strong> &nbsp;|&nbsp;
+        <strong style="color: #ff6ec7">Kanan = Player 2</strong><br />
+        Bola lolos → -1 ❤️ &nbsp;•&nbsp; 3 nyawa per pemain
+      </p>
+      <div class="winner" id="winnerMsg" style="display: none"></div>
+      <button id="startBtn" onclick="startGame()">▶ MULAI</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"
+      crossorigin="anonymous"
+    ></script>
+
+    <script>
+      // ═══════════════════════════════════════════════════════════════
+      // WEB AUDIO – Chiptune BGM + SFX
+      // ═══════════════════════════════════════════════════════════════
+      let audioCtx = null;
+      let musicOn = true;
+      let bgmNodes = []; // oscillator nodes for current BGM phrase
+      let bgmTimer = null;
+
+      document.getElementById("musicBtn").onclick = () => {
+        musicOn = !musicOn;
+        document.getElementById("musicBtn").textContent = musicOn ? "🎵" : "🔇";
+        if (musicOn) startBGM();
+        else stopBGM();
+      };
+
+      function getAudioCtx() {
+        if (!audioCtx)
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        return audioCtx;
+      }
+
+      // ─── SFX ────────────────────────────────────────────────────────
+      function sfxPop(color) {
+        if (!musicOn) return;
+        const ctx = getAudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "square";
+        const freq = color === "p1" ? 880 : 660;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(
+          freq * 2,
+          ctx.currentTime + 0.08,
+        );
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
+      }
+
+      function sfxMiss() {
+        if (!musicOn) return;
+        const ctx = getAudioCtx();
+        [220, 180].forEach((f, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(f, ctx.currentTime + i * 0.1);
+          gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.1);
+          gain.gain.exponentialRampToValueAtTime(
+            0.001,
+            ctx.currentTime + i * 0.1 + 0.25,
+          );
+          osc.start(ctx.currentTime + i * 0.1);
+          osc.stop(ctx.currentTime + i * 0.1 + 0.25);
+        });
+      }
+
+      function sfxGameOver() {
+        if (!musicOn) return;
+        const ctx = getAudioCtx();
+        [440, 350, 280, 220].forEach((f, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = "square";
+          osc.frequency.setValueAtTime(f, ctx.currentTime + i * 0.18);
+          gain.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.18);
+          gain.gain.exponentialRampToValueAtTime(
+            0.001,
+            ctx.currentTime + i * 0.18 + 0.3,
+          );
+          osc.start(ctx.currentTime + i * 0.18);
+          osc.stop(ctx.currentTime + i * 0.18 + 0.35);
+        });
+      }
+
+      // ─── BGM – simple chiptune sequencer ────────────────────────────
+      // Note frequencies (A4=440, 8-bit scale)
+      const NOTE = {
+        C3: 131,
+        D3: 147,
+        E3: 165,
+        F3: 175,
+        G3: 196,
+        A3: 220,
+        B3: 247,
+        C4: 262,
+        D4: 294,
+        E4: 330,
+        F4: 349,
+        G4: 392,
+        A4: 440,
+        B4: 494,
+        C5: 523,
+        D5: 587,
+        E5: 659,
+        F5: 698,
+        G5: 784,
+        A5: 880,
+        _: 0, // rest
+      };
+
+      // Melody & bass patterns (16 steps, each step = bpm/4)
+      const BPM = 148;
+      const STEP = 60 / BPM / 4; // seconds per 16th note
+
+      const MELODY = [
+        NOTE.E5,
+        NOTE._,
+        NOTE.E5,
+        NOTE._,
+        NOTE.C5,
+        NOTE.E5,
+        NOTE._,
+        NOTE.G5,
+        NOTE._,
+        NOTE._,
+        NOTE.G4,
+        NOTE._,
+        NOTE._,
+        NOTE._,
+        NOTE._,
+        NOTE._,
+      ];
+      const BASS = [
+        NOTE.C3,
+        NOTE._,
+        NOTE.C3,
+        NOTE.G3,
+        NOTE._,
+        NOTE.A3,
+        NOTE._,
+        NOTE.F3,
+        NOTE.C3,
+        NOTE.G3,
+        NOTE.A3,
+        NOTE._,
+        NOTE.F3,
+        NOTE.G3,
+        NOTE._,
+        NOTE._,
+      ];
+      const MELODY2 = [
+        NOTE.G5,
+        NOTE._,
+        NOTE.F5,
+        NOTE.E5,
+        NOTE._,
+        NOTE.C5,
+        NOTE._,
+        NOTE.E4,
+        NOTE._,
+        NOTE.G4,
+        NOTE.A4,
+        NOTE._,
+        NOTE.A4,
+        NOTE.G4,
+        NOTE._,
+        NOTE._,
+      ];
+
+      let seqStep = 0;
+      let seqPhase = 0;
+      let seqTimeout = null;
+
+      function scheduleNote(freq, type, vol, when, dur) {
+        if (!freq) return;
+        const ctx = getAudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, when);
+        gain.gain.setValueAtTime(vol, when);
+        gain.gain.exponentialRampToValueAtTime(0.001, when + dur * 0.9);
+        osc.start(when);
+        osc.stop(when + dur);
+      }
+
+      function tickBGM() {
+        if (!musicOn) return;
+        const ctx = getAudioCtx();
+        const when = ctx.currentTime;
+        const mel = seqPhase === 0 ? MELODY : MELODY2;
+
+        scheduleNote(mel[seqStep], "square", 0.07, when, STEP * 0.85);
+        scheduleNote(BASS[seqStep], "triangle", 0.1, when, STEP * 0.7);
+
+        seqStep++;
+        if (seqStep >= 16) {
+          seqStep = 0;
+          seqPhase = 1 - seqPhase;
+        }
+
+        seqTimeout = setTimeout(tickBGM, STEP * 1000);
+      }
+
+      function startBGM() {
+        stopBGM();
+        seqStep = 0;
+        seqPhase = 0;
+        tickBGM();
+      }
+
+      function stopBGM() {
+        if (seqTimeout) {
+          clearTimeout(seqTimeout);
+          seqTimeout = null;
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // LOADER
+      // ═══════════════════════════════════════════════════════════════
+      const loaderEl = document.getElementById("loader");
+      const loaderFill = document.getElementById("loaderFill");
+      const loaderStat = document.getElementById("loaderStatus");
+      const splashEl = document.getElementById("splash");
+
+      function setLoader(pct, msg) {
+        loaderFill.style.width = pct + "%";
+        loaderStat.textContent = msg;
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // SKELETON CANVAS (2D – throttled, only redraws when data changes)
+      // ═══════════════════════════════════════════════════════════════
+      const skelCanvas = document.getElementById("skelCanvas");
+      const skelCtx = skelCanvas.getContext("2d");
+      let skelDirty = false;
+
+      function resizeSkel() {
+        skelCanvas.width = window.innerWidth;
+        skelCanvas.height = window.innerHeight;
+        skelDirty = true;
+      }
+      resizeSkel();
+      window.addEventListener("resize", () => {
+        resizeSkel();
+        resizeGame();
+      });
+
+      // Only the landmark edges we need (no fancy imports)
+      const CONNS = [
+        [0, 1],
+        [1, 2],
+        [2, 3],
+        [3, 4],
+        [0, 5],
+        [5, 6],
+        [6, 7],
+        [7, 8],
+        [5, 9],
+        [9, 10],
+        [10, 11],
+        [11, 12],
+        [9, 13],
+        [13, 14],
+        [14, 15],
+        [15, 16],
+        [13, 17],
+        [17, 18],
+        [18, 19],
+        [19, 20],
+        [0, 17],
+      ];
+      const TIPS = [4, 8, 12, 16, 20];
+
+      function drawSkeleton(lms, col) {
+        const W = window.innerWidth,
+          H = window.innerHeight;
+        skelCtx.strokeStyle = col;
+        skelCtx.lineWidth = 2;
+        skelCtx.globalAlpha = 0.7;
+        for (const [a, b] of CONNS) {
+          skelCtx.beginPath();
+          skelCtx.moveTo((1 - lms[a].x) * W, lms[a].y * H);
+          skelCtx.lineTo((1 - lms[b].x) * W, lms[b].y * H);
+          skelCtx.stroke();
+        }
+        // Joints
+        for (let i = 0; i < lms.length; i++) {
+          const x = (1 - lms[i].x) * W,
+            y = lms[i].y * H;
+          const tip = TIPS.includes(i);
+          skelCtx.globalAlpha = 1;
+          skelCtx.beginPath();
+          skelCtx.arc(x, y, tip ? 7 : 3, 0, Math.PI * 2);
+          skelCtx.fillStyle = tip ? "#fff" : col;
+          skelCtx.fill();
+          if (tip) {
+            skelCtx.beginPath();
+            skelCtx.arc(x, y, 13, 0, Math.PI * 2);
+            skelCtx.strokeStyle = col;
+            skelCtx.lineWidth = 1.5;
+            skelCtx.globalAlpha = 0.45;
+            skelCtx.stroke();
+          }
+        }
+        skelCtx.globalAlpha = 1;
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // THREE.JS SETUP  –  transparent overlay
+      // ═══════════════════════════════════════════════════════════════
+      const gameCanvas = document.getElementById("gameCanvas");
+      const renderer = new THREE.WebGLRenderer({
+        canvas: gameCanvas,
+        antialias: false,
+        alpha: true,
+        powerPreference: "high-performance",
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // cap pixel ratio
+      renderer.setClearColor(0x000000, 0);
+
+      const scene = new THREE.Scene();
+      const W = () => window.innerWidth;
+      const H = () => window.innerHeight;
+
+      // Correct ortho: top=0 means y=0 is screen top, y=H() is screen bottom
+      let cam = new THREE.OrthographicCamera(0, W(), 0, H(), -100, 100);
+
+      function resizeGame() {
+        renderer.setSize(W(), H());
+        cam.right = W();
+        cam.bottom = H();
+        cam.updateProjectionMatrix();
+      }
+      resizeGame();
+
+      // Minimal lighting
+      scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+      const dLight = new THREE.DirectionalLight(0xffffff, 1.0);
+      dLight.position.set(0.3, -0.5, 1);
+      scene.add(dLight);
+
+      // ═══════════════════════════════════════════════════════════════
+      // SHARED GEOMETRIES & MATERIALS (reused across balls)
+      // Low segment count for performance
+      // ═══════════════════════════════════════════════════════════════
+      const BALL_SEGS = 10; // was 28, big win
+      const sharedSphereGeo = new THREE.SphereGeometry(1, BALL_SEGS, BALL_SEGS); // scale per ball
+
+      const COLORS_P1 = [0x00e5ff, 0x29b6f6, 0x00bcd4, 0x40c4ff];
+      const COLORS_P2 = [0xff6ec7, 0xf06292, 0xce93d8, 0xff80ab];
+
+      // Prebuilt materials for each color
+      function makeMat(color) {
+        return new THREE.MeshPhongMaterial({
+          color,
+          emissive: color,
+          emissiveIntensity: 0.45,
+          shininess: 80,
+          specular: 0xffffff,
+          transparent: true,
+          opacity: 0.92,
+        });
+      }
+      const matsP1 = COLORS_P1.map(makeMat);
+      const matsP2 = COLORS_P2.map(makeMat);
+
+      // ═══════════════════════════════════════════════════════════════
+      // GAME STATE
+      // ═══════════════════════════════════════════════════════════════
+      let gameRunning = false;
+      const INIT_LIVES = 3;
+      const state = {
+        p1: { score: 0, lives: INIT_LIVES },
+        p2: { score: 0, lives: INIT_LIVES },
+      };
+      const balls = { p1: [], p2: [] };
+      const fingerPos = { p1: [], p2: [] };
+      let lastLandmarks = [];
+
+      // ═══════════════════════════════════════════════════════════════
+      // HUD
+      // ═══════════════════════════════════════════════════════════════
+      function updateHUD() {
+        document.getElementById("score-p1").textContent = state.p1.score;
+        document.getElementById("score-p2").textContent = state.p2.score;
+        for (let i = 1; i <= 3; i++) {
+          document
+            .getElementById("p1h" + i)
+            .classList.toggle("dead", i > state.p1.lives);
+          document
+            .getElementById("p2h" + i)
+            .classList.toggle("dead", i > state.p2.lives);
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // BALL SPAWN  – reuse shared geometry, scaled to radius
+      // ═══════════════════════════════════════════════════════════════
+      function spawnBall(player) {
+        const half = W() / 2;
+        const r = 26 + Math.random() * 22;
+        const speed = 80 + Math.random() * 130;
+        const mats = player === "p1" ? matsP1 : matsP2;
+        const idx = Math.floor(Math.random() * mats.length);
+        const mat = mats[idx].clone(); // clone only material, not geo
+        mat.emissiveIntensity = 0.45;
+
+        const mesh = new THREE.Mesh(sharedSphereGeo, mat);
+        mesh.scale.setScalar(r); // scale geometry by radius
+
+        const xMin = (player === "p1" ? 0 : half) + r + 6;
+        const xMax = (player === "p1" ? half : W()) - r - 6;
+        const x = xMin + Math.random() * (xMax - xMin);
+
+        // Spawn above screen
+        mesh.position.set(x, -r - 10, 0);
+        scene.add(mesh);
+
+        return {
+          mesh,
+          r,
+          speed,
+          player,
+          matColor: COLORS_P1.concat(COLORS_P2)[idx],
+        };
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // POP BURST  – drawn on skelCanvas (no Three.js geo updates)
+      // ═══════════════════════════════════════════════════════════════
+      const burstList = [];
+
+      function popBurst(x, y, color) {
+        const col = "#" + color.toString(16).padStart(6, "0");
+        burstList.push({
+          x,
+          y,
+          col,
+          t: 0,
+          particles: Array.from({ length: 14 }, () => ({
+            vx: (Math.random() - 0.5) * 320,
+            vy: (Math.random() - 0.5) * 320,
+            px: x,
+            py: y,
+          })),
+        });
+      }
+
+      function updateBursts(dt) {
+        for (let i = burstList.length - 1; i >= 0; i--) {
+          const b = burstList[i];
+          b.t += dt;
+          if (b.t > 0.45) {
+            burstList.splice(i, 1);
+            continue;
+          }
+          const alpha = 1 - b.t / 0.45;
+          skelCtx.globalAlpha = alpha;
+          skelCtx.fillStyle = b.col;
+          for (const p of b.particles) {
+            p.px += p.vx * dt;
+            p.py += p.vy * dt;
+            skelCtx.beginPath();
+            skelCtx.arc(p.px, p.py, 4, 0, Math.PI * 2);
+            skelCtx.fill();
+          }
+        }
+        skelCtx.globalAlpha = 1;
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // COLLISION
+      // ═══════════════════════════════════════════════════════════════
+      function checkCollisions(player) {
+        const pb = balls[player],
+          fp = fingerPos[player];
+        for (let i = pb.length - 1; i >= 0; i--) {
+          const b = pb[i];
+          const bx = b.mesh.position.x,
+            by = b.mesh.position.y;
+          for (const f of fp) {
+            const dx = f.x - bx,
+              dy = f.y - by;
+            if (dx * dx + dy * dy < (b.r + 18) * (b.r + 18)) {
+              popBurst(bx, by, b.mesh.material.color.getHex());
+              scene.remove(b.mesh);
+              pb.splice(i, 1);
+              state[player].score += 10;
+              updateHUD();
+              sfxPop(player);
+              break;
+            }
+          }
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // GAME OVER
+      // ═══════════════════════════════════════════════════════════════
+      function clearBalls(p) {
+        balls[p].forEach((b) => scene.remove(b.mesh));
+        balls[p] = [];
+      }
+
+      function checkGameOver() {
+        if (state.p1.lives > 0 && state.p2.lives > 0) return;
+        gameRunning = false;
+        clearBalls("p1");
+        clearBalls("p2");
+        stopBGM();
+        sfxGameOver();
+        const w =
+          state.p1.lives <= 0 && state.p2.lives <= 0
+            ? "Seri! 🤝"
+            : state.p1.lives <= 0
+              ? "🏆 Player 2 Menang!"
+              : "🏆 Player 1 Menang!";
+        const wm = document.getElementById("winnerMsg");
+        wm.textContent = `${w}  (P1:${state.p1.score} • P2:${state.p2.score})`;
+        wm.style.display = "block";
+        document.getElementById("splashTitle").textContent = "GAME OVER";
+        document.getElementById("splashDesc").textContent =
+          "Tekan MULAI untuk main lagi!";
+        document.getElementById("startBtn").textContent = "▶ MAIN LAGI";
+        splashEl.style.display = "flex";
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // SPAWN TIMING
+      // ═══════════════════════════════════════════════════════════════
+      let spawnTimer = { p1: 0, p2: 0 },
+        elapsed = 0;
+      function spawnInterval() {
+        return Math.max(0.7, 2.0 - Math.floor(elapsed / 15) * 0.07);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // GAME LOOP  – render at native fps, MediaPipe independent
+      // ═══════════════════════════════════════════════════════════════
+      let lastTs = null;
+
+      function animate(ts) {
+        requestAnimationFrame(animate);
+        const dt = lastTs === null ? 0 : Math.min((ts - lastTs) / 1000, 0.05); // cap dt at 50ms
+        lastTs = ts;
+
+        // Clear skeleton canvas each frame
+        skelCtx.clearRect(0, 0, skelCanvas.width, skelCanvas.height);
+
+        // Draw skeletons (only if there are landmarks)
+        if (lastLandmarks.length > 0) {
+          for (const { lms, isLeft } of lastLandmarks) {
+            drawSkeleton(lms, isLeft ? "#00e5ff" : "#ff6ec7");
+          }
+        }
+
+        // Draw bursts onto skelCanvas
+        updateBursts(dt);
+
+        if (!gameRunning) {
+          renderer.render(scene, cam);
+          return;
+        }
+
+        elapsed += dt;
+
+        // Spawn
+        for (const p of ["p1", "p2"]) {
+          spawnTimer[p] += dt;
+          if (spawnTimer[p] >= spawnInterval()) {
+            spawnTimer[p] = 0;
+            balls[p].push(spawnBall(p));
+          }
+        }
+
+        // Move & miss
+        const diff = Math.floor(elapsed / 15);
+        for (const p of ["p1", "p2"]) {
+          for (let i = balls[p].length - 1; i >= 0; i--) {
+            const b = balls[p][i];
+            b.mesh.position.y += (b.speed + diff * 18) * dt;
+            if (b.mesh.position.y - b.r > H()) {
+              scene.remove(b.mesh);
+              balls[p].splice(i, 1);
+              state[p].lives = Math.max(0, state[p].lives - 1);
+              updateHUD();
+              sfxMiss();
+              checkGameOver();
+            }
+          }
+        }
+
+        checkCollisions("p1");
+        checkCollisions("p2");
+        renderer.render(scene, cam);
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // SCREEN WAKE LOCK (keep screen on during game)
+      // ═══════════════════════════════════════════════════════════════
+      let wakeLock = null;
+      async function requestWakeLock() {
+        try {
+          if ("wakeLock" in navigator) {
+            wakeLock = await navigator.wakeLock.request("screen");
+          }
+        } catch (e) {
+          /* not supported, ignore */
+        }
+      }
+      function releaseWakeLock() {
+        if (wakeLock) {
+          wakeLock.release();
+          wakeLock = null;
+        }
+      }
+      // Re-acquire on visibility change (iOS Safari releases on background)
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && gameRunning)
+          requestWakeLock();
+      });
+
+      // ═══════════════════════════════════════════════════════════════
+      // START / RESTART
+      // ═══════════════════════════════════════════════════════════════
+      window.startGame = function () {
+        getAudioCtx(); // unlock audio context on user gesture
+        requestWakeLock(); // keep screen on
+        state.p1.score = 0;
+        state.p1.lives = INIT_LIVES;
+        state.p2.score = 0;
+        state.p2.lives = INIT_LIVES;
+        updateHUD();
+        clearBalls("p1");
+        clearBalls("p2");
+        fingerPos.p1 = [];
+        fingerPos.p2 = [];
+        elapsed = 0;
+        lastTs = null;
+        spawnTimer = { p1: 0, p2: 0 };
+        document.getElementById("winnerMsg").style.display = "none";
+        splashEl.style.display = "none";
+        gameRunning = true;
+        if (musicOn) startBGM();
+      };
+
+      // ═══════════════════════════════════════════════════════════════
+      // MEDIAPIPE  – model 0 for speed
+      // ═══════════════════════════════════════════════════════════════
+      async function init() {
+        setLoader(20, "Menginisialisasi MediaPipe Hands…");
+
+        const hands = new Hands({
+          locateFile: (f) =>
+            `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}`,
+        });
+        hands.setOptions({
+          maxNumHands: 4,
+          modelComplexity: 0, // 0 = lightweight, faster!
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.5,
+        });
+
+        hands.onResults((results) => {
+          const newP1 = [],
+            newP2 = [];
+          lastLandmarks = [];
+          if (results.multiHandLandmarks) {
+            for (const lms of results.multiHandLandmarks) {
+              const wristX = (1 - lms[0].x) * W();
+              const isLeft = wristX < W() / 2;
+              lastLandmarks.push({ lms, isLeft });
+              if (!gameRunning) continue;
+              for (const tid of TIPS) {
+                const sx = (1 - lms[tid].x) * W(),
+                  sy = lms[tid].y * H();
+                if (isLeft) newP1.push({ x: sx, y: sy });
+                else newP2.push({ x: sx, y: sy });
+              }
+            }
+          }
+          if (gameRunning) {
+            fingerPos.p1 = newP1;
+            fingerPos.p2 = newP2;
+          }
+        });
+
+        setLoader(50, "Minta akses kamera…");
+        const videoEl = document.getElementById("webcam");
+
+        const mpCam = new Camera(videoEl, {
+          onFrame: async () => {
+            await hands.send({ image: videoEl });
+          },
+          width: 640,
+          height: 480,
+        });
+        try {
+          await mpCam.start();
+        } catch (e) {
+          loaderStat.textContent = "❌ Gagal akses kamera: " + e.message;
+          return;
+        }
+
+        setLoader(80, "Memuat model AI…");
+        await new Promise((r) => setTimeout(r, 2500));
+        setLoader(100, "Siap! ✓");
+        await new Promise((r) => setTimeout(r, 400));
+
+        loaderEl.style.transition = "opacity .5s";
+        loaderEl.style.opacity = "0";
+        setTimeout(() => {
+          loaderEl.style.display = "none";
+        }, 500);
+
+        splashEl.style.display = "flex";
+        requestAnimationFrame(animate);
+      }
+
+      init();
+    </script>
+  </body>
+</html>
